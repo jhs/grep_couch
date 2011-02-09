@@ -1,5 +1,5 @@
-#!/usr/bin/env escript
-%%! -smp enable
+-module(grep_couch).
+-export([main/1]).
 
 -define(MB       , 1 * 1024 * 1024).
 -define(READ_SIZE, 1 * 1024 * 1024).
@@ -7,8 +7,10 @@
 %-define(MAGIC_LEN, 6).
 %-define(T2B_MAGIC, <<131, 108, 0, 0>>).
 %-define(MAGIC_LEN, 4).
--define(T2B_MAGIC, <<131, 104>>).
--define(MAGIC_LEN, 2).
+
+% Looking for 2-tuples where the first element is a 1-tuple.
+-define(T2B_MAGIC, <<131, 104, 2, 104, 1>>).
+-define(MAGIC_LEN, 5).
 
 usage()
     -> io:format("usage: grep_couchdb /path/to/some/file\n")
@@ -116,7 +118,20 @@ find_terms(Data, Sofar, Eof)
     .
 
 found_term(Term)
-    -> io:format("TERM (~p): ~p\n", [size(term_to_binary(Term)), Term])
+    -> io:format("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
+    , case Term
+        of {Ejson, []}
+            -> Handler =
+                fun ({L}) when is_list(L)
+                    -> {struct, L}
+                ; (Bad)
+                    -> exit({json_encode, {bad_term, Bad}})
+                end
+            , Json = (mochijson2:encoder([{handler, Handler}]))(Ejson)
+            , io:format("JSON: ~s\n", [Json])
+        ; _
+            -> io:format("UNKNOWN TERM:\n~p\n", [Term])
+        end
     .
 
-%% vim: sts=4 sw=4 etk
+%% vim: sts=4 sw=4 et
