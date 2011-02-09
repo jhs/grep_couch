@@ -12,6 +12,19 @@
 -define(T2B_MAGIC, <<131, 104, 2, 104, 1>>).
 -define(MAGIC_LEN, 5).
 
+puts(Str)
+    -> puts(Str, [])
+    .
+
+puts(Str, Args)
+    -> case os:getenv("verbose")
+        of "true"
+            -> io:format(Str, Args)
+        ; _
+            -> ok
+        end
+    .
+
 usage()
     -> io:format("usage: grep_couchdb /path/to/some/file\n")
     , halt(1)
@@ -22,7 +35,7 @@ main([])
     ;
 
 main(Args=[Path | _Rest]) when is_list(Args)
-    -> io:format("Scanning ~p\n", [Path])
+    -> puts("Scanning ~p\n", [Path])
     , {ok, File} = file:open(Path, [read, raw, binary, {read_ahead, 4 * ?MB}])
     , json_scan(File)
     , halt(0)
@@ -39,14 +52,14 @@ json_scan(File)
 json_scan(File, Offset, Pending, Eof)
     -> PendingSize = size(Pending)
     , CurrentPos = Offset - PendingSize
-    , io:format("Pos=~p PendingSize=~p\n", [CurrentPos, PendingSize])
+    , puts("Pos=~p PendingSize=~p\n", [CurrentPos, PendingSize])
 
     , Result = find_terms(Pending, Eof)
-    , io:format(" Result: ~p\n", [Result])
+    , puts(" Result: ~p\n", [Result])
 
     , case Result
         of {error, Reason}
-            -> io:format("ERROR: ~p\n", [Reason])
+            -> puts("ERROR: ~p\n", [Reason])
         ; {ok, Consumed}
             -> Remainder = binary:part(Pending, {Consumed, PendingSize - Consumed})
             , case Eof
@@ -54,7 +67,7 @@ json_scan(File, Offset, Pending, Eof)
                     % find_terms() should have consumed the entire file.
                     -> case Remainder
                         of <<"">>
-                            -> io:format("Done.\n")
+                            -> puts("Done.\n")
                         ; _
                             -> throw({bad_finish, Remainder})
                         end
@@ -62,7 +75,7 @@ json_scan(File, Offset, Pending, Eof)
                     % find_terms() needs more data.
                     -> case file:read(File, ?READ_SIZE)
                         of {error, Reason}
-                            -> io:format("ERROR reading: ~p\n", [Reason])
+                            -> puts("ERROR reading: ~p\n", [Reason])
                         ; eof
                             -> json_scan(File, Offset + Consumed, Remainder, true)
                         ; {ok, Data}
@@ -104,11 +117,11 @@ find_terms(Data, Sofar, Eof)
                             , find_terms(Remainder, Sofar + Offset + TermLength, Eof)
                     catch error:badarg
                         % Despite the magic string being found, a term is not here. Skip over the magic bytes.
-                        -> io:format("Sneaky data (~p):\n~p\nEND SNEAKY\n", [CandidateLength, Candidate])
+                        -> puts("Sneaky data (~p):\n~p\nEND SNEAKY\n", [CandidateLength, Candidate])
                         % Probably not enough data collected.
                         , {ok, Sofar + Offset + ?MAGIC_LEN}
                     ; Type:Er
-                        -> io:format("Unknown error: ~p:~p\n", [Type, Er])
+                        -> puts("Unknown error: ~p:~p\n", [Type, Er])
                     end
                 ; false
                     % Not enough bytes in Candidate to try to find a term. More data is needed.
@@ -118,7 +131,7 @@ find_terms(Data, Sofar, Eof)
     .
 
 found_term(Term)
-    -> io:format("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
+    -> puts("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
     , case Term
         of {Ejson, []}
             -> Handler =
@@ -128,7 +141,7 @@ found_term(Term)
                     -> exit({json_encode, {bad_term, Bad}})
                 end
             , Json = (mochijson2:encoder([{handler, Handler}]))(Ejson)
-            , io:format("JSON: ~s\n", [Json])
+            , io:format("~s\n", [Json])
         ; _
             -> io:format("UNKNOWN TERM:\n~p\n", [Term])
         end
