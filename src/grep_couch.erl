@@ -135,7 +135,9 @@ find_terms(Data, Sofar, Eof)
 found_term(Term)
     -> puts("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
     , case Term
-        of {Ejson, _Extra}
+        of { {[]}, _Extra }
+            -> ok % Do not process a totally empty object.
+        ; {Ejson, _Extra}
             -> Handler =
                 fun ({L}) when is_list(L)
                     -> {struct, L}
