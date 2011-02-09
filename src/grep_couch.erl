@@ -69,7 +69,7 @@ json_scan(File, Offset, Pending, Eof)
                         of <<"">>
                             -> puts("Done.\n")
                         ; _
-                            -> throw({bad_finish, Remainder})
+                            -> exit({bad_finish, Remainder})
                         end
                 ; false
                     % find_terms() needs more data.
@@ -119,9 +119,11 @@ find_terms(Data, Sofar, Eof)
                         % Despite the magic string being found, a term is not here. Skip over the magic bytes.
                         -> puts("Sneaky data (~p):\n~p\nEND SNEAKY\n", [CandidateLength, Candidate])
                         % Probably not enough data collected.
-                        , {ok, Sofar + Offset + ?MAGIC_LEN}
+                        , Remainder = binary:part(Candidate, {?MAGIC_LEN, CandidateLength - ?MAGIC_LEN})
+                        , find_terms(Remainder, Sofar + Offset + ?MAGIC_LEN, Eof)
                     ; Type:Er
-                        -> puts("Unknown error: ~p:~p\n", [Type, Er])
+                        -> exit({Type, Er})
+                        %-> puts("Unknown error: ~p:~p\n", [Type, Er])
                     end
                 ; false
                     % Not enough bytes in Candidate to try to find a term. More data is needed.
@@ -133,17 +135,22 @@ find_terms(Data, Sofar, Eof)
 found_term(Term)
     -> puts("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
     , case Term
-        of {Ejson, []}
+        of {Ejson, _Extra}
             -> Handler =
                 fun ({L}) when is_list(L)
                     -> {struct, L}
                 ; (Bad)
-                    -> exit({json_encode, {bad_term, Bad}})
+                    -> puts("JSON ERROR: ~p\n", [Bad])
+                    , exit({json_encode, {bad_term, Bad}})
                 end
-            , Json = (mochijson2:encoder([{handler, Handler}]))(Ejson)
-            , io:format("~s\n", [Json])
+            , try (mochijson2:encoder([{handler, Handler}]))(Ejson)
+                of Json
+                    -> io:format("~s\n", [Json])
+                catch Type:Er
+                    -> puts("MOCHIJSON ERROR: ~p:~p\nEjson=~p\n", [Type, Er, Ejson])
+                end
         ; _
-            -> io:format("UNKNOWN TERM:\n~p\n", [Term])
+            -> puts("UNKNOWN TERM:\n~p\n", [Term])
         end
     .
 
