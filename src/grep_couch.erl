@@ -5,14 +5,30 @@
 -define(READ_SIZE, 1 * 1024 * 1024).
 %-define(READ_SIZE, 1 * 1024).
 
+% Look for 1-tuples where the first element is a list with fewer than 65k elements.
 %-define(T2B_MAGIC, <<131, 104, 1, 108, 0, 0>>).
 %-define(MAGIC_LEN, 6).
+
+% Look for lists with fewer than 65k elements.
 %-define(T2B_MAGIC, <<131, 108, 0, 0>>).
 %-define(MAGIC_LEN, 4).
 
+% Look for 2-tuples where the first element is an atom.
+%-define(T2B_MAGIC, <<131, 104, 2, 100>>).
+%-define(MAGIC_LEN, 4).
+
+% Look for anything.
+%-define(T2B_MAGIC, <<131>>).
+%-define(MAGIC_LEN, 1).
+
 % Looking for 2-tuples where the first element is a 1-tuple.
--define(T2B_MAGIC, <<131, 104, 2, 104, 1>>).
--define(MAGIC_LEN, 5).
+%-define(T2B_MAGIC, <<131, 104, 2, 104, 1>>).
+%-define(MAGIC_LEN, 5).
+
+% Look for any 2-tuple.
+-define(T2B_MAGIC, <<131, 104, 2>>).
+-define(MAGIC_LEN, 3).
+
 
 puts(Str)
     -> puts(Str, [])
@@ -150,9 +166,14 @@ find_terms(Data, Sofar, Eof, Log)
 
 found_term(Term, Log)
     -> puts("TERM (~p): ~w\n", [size(term_to_binary(Term)), Term])
+    , Log({found_term, Term})
     , case Term
         of { {[]}, _Extra }
             -> ok % Do not process a totally empty object.
+        ; {kv_node, [ {DocId, _Info} ]} when is_binary(DocId) andalso is_tuple(_Info)
+            -> io:format("{\"_id\":\"~s\"}\n", [DocId])
+        ; {kv_node, Other}
+            -> Log({kv_node, Other})
         ; {Ejson, _Extra}
             -> Handler =
                 fun ({L}) when is_list(L)
@@ -164,7 +185,8 @@ found_term(Term, Log)
                 end
             , try (mochijson2:encoder([{handler, Handler}]))(Ejson)
                 of Json
-                    -> io:format("~s\n", [Json])
+                    %-> io:format("~s\n", [Json])
+                    -> io:format([Json, <<"\n">>])
                 catch Type:Er
                     -> puts("MOCHIJSON ERROR: ~p:~p\nEjson=~p\n", [Type, Er, Ejson])
                     , Log({json_encode, Term})
