@@ -7,7 +7,6 @@ grep_couch: ebin.zip
 	echo '#!/usr/bin/env escript' > $@
 	echo '%%! -smp enable -escript main grep_couch' >> $@
 	cat ebin.zip >> $@
-	rm ebin.zip
 	chmod +x $@
 
 ebin:
