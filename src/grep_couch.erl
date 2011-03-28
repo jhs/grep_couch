@@ -175,8 +175,8 @@ found_term(Term, Log)
     , case Term
         of { {[]}, _Extra }
             -> ok % Do not process a totally empty object.
-        ; {kv_node, [ {DocId, _Info} ]} when is_binary(DocId) andalso is_tuple(_Info)
-            -> io:format("{\"_id\":\"~s\"}\n", [DocId])
+        ; {kv_node, Kvs} when is_list(Kvs)
+            -> found_kv_nodes(Kvs)
         ; {kv_node, Other}
             -> Log({kv_node, Other})
         ; {Ejson, _Extra}
@@ -200,6 +200,24 @@ found_term(Term, Log)
             -> puts("UNKNOWN TERM:\n~p\n", [Term])
             , Log({unknown_term, Term})
         end
+    .
+
+found_kv_nodes([])
+    -> ok
+    ;
+
+found_kv_nodes([ {_Seq, {DocId, _Info1, _Info2}} | Rest ]) when is_integer(_Seq) andalso is_binary(DocId) andalso is_list(_Info1) andalso is_list(_Info2)
+    -> found_id(DocId)
+    , found_kv_nodes(Rest)
+    ;
+
+found_kv_nodes([ {DocId, _Info} | Rest ]) when is_binary(DocId) andalso is_tuple(_Info)
+    -> found_id(DocId)
+    , found_kv_nodes(Rest)
+    .
+
+found_id(DocId)
+    -> io:format("{\"_id\":\"~s\"}\n", [DocId])
     .
 
 %% vim: sts=4 sw=4 et
