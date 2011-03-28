@@ -66,7 +66,12 @@ main(Args=[Path | _Rest]) when is_list(Args)
             end
         end
     , json_scan(File, LogTerm)
-    , halt(0)
+
+    % Give the output a moment to finish writing; just wait since I'm not sure how to know when it's really done.
+    , receive
+        after 200
+            -> halt(0)
+        end
     ;
 
 main(_)
