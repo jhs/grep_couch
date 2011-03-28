@@ -176,7 +176,7 @@ found_term(Term, Log)
         of { {[]}, _Extra }
             -> ok % Do not process a totally empty object.
         ; {kv_node, Kvs} when is_list(Kvs)
-            -> found_kv_nodes(Kvs)
+            -> found_kv_nodes(Kvs, Log)
         ; {kv_node, Other}
             -> Log({kv_node, Other})
         ; {Ejson, _Extra}
@@ -202,18 +202,23 @@ found_term(Term, Log)
         end
     .
 
-found_kv_nodes([])
+found_kv_nodes([], _Log)
     -> ok
     ;
 
-found_kv_nodes([ {_Seq, {DocId, _Info1, _Info2}} | Rest ]) when is_integer(_Seq) andalso is_binary(DocId) andalso is_list(_Info1) andalso is_list(_Info2)
+found_kv_nodes([ {_Seq, {DocId, _Info1, _Info2}} | Rest ], Log) when is_integer(_Seq) andalso is_binary(DocId) andalso is_list(_Info1) andalso is_list(_Info2)
     -> found_id(DocId)
-    , found_kv_nodes(Rest)
+    , found_kv_nodes(Rest, Log)
     ;
 
-found_kv_nodes([ {DocId, _Info} | Rest ]) when is_binary(DocId) andalso is_tuple(_Info)
+found_kv_nodes([ {DocId, _Info} | Rest ], Log) when is_binary(DocId) andalso is_tuple(_Info)
     -> found_id(DocId)
-    , found_kv_nodes(Rest)
+    , found_kv_nodes(Rest, Log)
+    ;
+
+found_kv_nodes(Arg, Log)
+    -> Log({unknown_kv_nodes, Arg})
+    , ok
     .
 
 found_id(DocId)
