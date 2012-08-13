@@ -153,7 +153,7 @@ find_terms(Data, Sofar, Eof, Log)
                     catch error:badarg
                         % Despite the magic string being found, a term is not here. Skip over the magic bytes.
                         % Probably not enough data collected.
-                        -> puts("Sneaky data (~p):\n~p\nEND SNEAKY\n", [CandidateLength, Candidate])
+                        -> puts("Sneaky data: ~w\n", [CandidateLength])
                         , Log({suspicious, CandidateLength, Candidate})
                         , Remainder = binary:part(Candidate, {?MAGIC_LEN, CandidateLength - ?MAGIC_LEN})
                         , find_terms(Remainder, Sofar + Offset + ?MAGIC_LEN, Eof, Log)
